@@ -44,6 +44,7 @@ import easybuild.tools.toolchain as toolchain
 from easybuild.framework.easyblock import EasyBlock
 from easybuild.framework.easyconfig import CUSTOM
 from easybuild.tools.build_log import EasyBuildError
+from easybuild.tools.filetools import write_file
 from easybuild.tools.modules import get_software_root
 from easybuild.tools.run import run_cmd
 from easybuild.tools.systemtools import get_glibc_version, UNKNOWN
@@ -121,32 +122,29 @@ class EB_Boost(EasyBlock):
             # http://www.boost.org/doc/libs/1_47_0/doc/html/mpi/getting_started.html
             # let Boost.Build know to look here for the config file
             f = open('user-config.jam', 'a')
-	    self.log.info("TC_CONSTANT_CRAYPE is %s " % (self.toolchain.TC_CONSTANT_CRAYPE))
-            if self.toolchain.TC_CONSTANT_CRAYPE in [toolchain.CRAYPE+'_GNU', toolchain.CRAYPE+'_Intel'] :
-                craympichdir=os.getenv('CRAY_MPICH2_DIR')
-                craygccversion=os.getenv('GCC_VERSION')
-		f = open('user-config.jam','a')
-		config = '\n'.join([	
-                'import os ; ',
-                'local CRAY_MPICH2_DIR =  %s ;' %(craympichdir),
-                'using gcc ',
-		': %s' %(craygccversion),
-                ': CC ',
-                ': <compileflags>-I$(CRAY_MPICH2_DIR)/include ',
-                '  <linkflags>-L$(CRAY_MPICH2_DIR)/lib \ ',
-                '; ',
-                'using mpi ',
-                ': CC ',
-                ': <find-shared-library>mpich ',
-                ': aprun -n \ ',
-                ';',
-		'',
-		])
-		f.write(config)
-	    else:
-	        f.write("using mpi : %s ;" % os.getenv("MPICXX"))
+            if self.toolchain.toolchain_family() == toolchain.CRAYPE:
+                craympichdir = os.getenv('CRAY_MPICH2_DIR')
+                craygccversion = os.getenv('GCC_VERSION')
+                user_config = '\n'.join([    
+                    'import os ; ',
+                    'local CRAY_MPICH2_DIR =  %s ;' % craympichdir,
+                    'using gcc ',
+                    ': %s' % craygccversion,
+                    ': CC ',
+                    ': <compileflags>-I$(CRAY_MPICH2_DIR)/include ',
+                    '  <linkflags>-L$(CRAY_MPICH2_DIR)/lib \ ',
+                    '; ',
+                    'using mpi ',
+                    ': CC ',
+                    ': <find-shared-library>mpich ',
+                    ': aprun -n \ ',
+                    ';',
+                    '',
+                ])
+            else:
+                user_config = "using mpi : %s ;" % os.getenv('MPICXX')
 
-	    f.close()
+        write_file('user-config.jam', user_config, append=True)
 
 
     def build_step(self):
